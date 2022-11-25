@@ -1,0 +1,108 @@
+version: "3.8"
+services:
+  openSearchService:
+    depends_on:
+      - postgresqlOpenSearch
+      - opensearch-node1
+      - opensearch-node2
+#      - opensearch-dashboards
+    container_name: ${OPEN_SEARCH_SERVICE_CONTAINER_NAME}
+    build:
+      context: .
+      dockerfile: DockerfileLocal
+    restart: unless-stopped
+    env_file: ./.env.local
+    ports:
+      - ${OPEN_SEARCH_SERVICE_LOCAL_PORT}:${OPEN_SEARCH_SERVICE_DOCKER_PORT}
+    image: opensearch-service-img
+    stdin_open: true
+    tty: true # allocate virtual terminal session within the container
+    networks:
+      - opensearch-service-app-network
+
+  opensearch-node1:
+    image: opensearchproject/opensearch:latest
+    container_name: ${OPENSEARCH_NODE_ONE}
+    environment:
+      - cluster.name=opensearch-cluster # Name the cluster
+      - node.name=opensearch-node1 # Name the node that will run in this container
+      - discovery.seed_hosts=opensearch-node1,opensearch-node2 # Nodes to look for when discovering the cluster
+      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2 # Nodes eligibile to serve as cluster manager
+      - bootstrap.memory_lock=true # Disable JVM heap memory swapping
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" # Set min and max JVM heap sizes to at least 50% of system RAM
+      - "DISABLE_INSTALL_DEMO_CONFIG=true" # Prevents execution of bundled demo script which installs demo certificates and security configurations to OpenSearch
+      - "DISABLE_SECURITY_PLUGIN=true" # Disables security plugin
+    ulimits:
+      memlock:
+        soft: -1 # Set memlock to unlimited (no soft or hard limit)
+        hard: -1
+      nofile:
+        soft: 65536 # Maximum number of open files for the opensearch user - set to at least 65536
+        hard: 65536
+    volumes:
+      - opensearch-data1:/usr/share/opensearch/data # Creates volume called opensearch-data1 and mounts it to the container
+    ports:
+      - ${OPENSEARCH_REST_API_PORT}:${OPENSEARCH_REST_API_PORT} # REST API
+      - 9600:9600 # Performance Analyzer
+    networks:
+      - opensearch-service-app-network
+  opensearch-node2:
+    image: opensearchproject/opensearch:latest
+    container_name: ${OPENSEARCH_NODE_TWO}
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node2
+      - discovery.seed_hosts=opensearch-node1,opensearch-node2
+      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "DISABLE_INSTALL_DEMO_CONFIG=true" # Prevents execution of bundled demo script which installs demo certificates and security configurations to OpenSearch
+      - "DISABLE_SECURITY_PLUGIN=true" # Disables security plugin
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data2:/usr/share/opensearch/data
+    networks:
+      - opensearch-service-app-network
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:latest
+    container_name: opensearch-dashboards
+    ports:
+      - 5601:5601 # Map host port 5601 to container port 5601
+    expose:
+      - "5601" # Expose port 5601 for web access to OpenSearch Dashboards
+    environment:
+      - 'OPENSEARCH_HOSTS=["http://opensearch-node1:9200","http://opensearch-node2:9200"]'
+      - "DISABLE_SECURITY_DASHBOARDS_PLUGIN=true" # disables security dashboards plugin in OpenSearch Dashboards
+    networks:
+      - opensearch-service-app-network
+
+  postgresqlOpenSearch:
+    image: postgres:14.4
+    restart: unless-stopped
+    env_file: ./.env.local
+    container_name: ${POSTGRES_CONTAINER_NAME}
+    ports:
+      - ${POSTGRES_LOCAL_PORT}:${POSTGRES_DOCKER_PORT}
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PWD}
+      POSTGRES_USER: ${POSTGRES_UN}
+      POSTGRES_DB: ${POSTGRES_DATABASE}
+      PGDATA: /data/postgres
+    volumes:
+      - /data:/var/lib/postgresql/data
+    networks:
+      - opensearch-service-app-network
+
+networks:
+  opensearch-service-app-network:
+    driver: bridge
+
+volumes:
+  opensearch-data1:
+  opensearch-data2:
