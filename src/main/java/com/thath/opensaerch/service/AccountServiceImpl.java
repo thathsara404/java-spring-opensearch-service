@@ -11,6 +11,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 /**
  * Implementation of IAccountService
  * */
@@ -61,6 +64,44 @@ public class AccountServiceImpl implements IAccountService {
 
         }
 
+    }
+
+    /**
+     * Find account by age and map to AccountDTO
+     * @param age Long
+     * @return AccountDTO
+     * */
+    @Override
+    public List<AccountDTO> findByAge(Long age) {
+        try {
+            logger.info("Account details are being fetched by age {} ", age);
+            List<Account> accounts  = accountRepository.findByAge(age);
+            List<AccountDTO> accountsDTO = accounts.stream().map(acc -> new AccountDTO(
+                    acc.getAccount_number(),
+                    acc.getAddress(),
+                    acc.getBalance(),
+                    acc.getCity(),
+                    acc.getAge()
+            )).collect(Collectors.toList());
+            return accountsDTO;
+
+        } catch (UnExpectedResultFoundException exception) {
+
+            String errorMessage = exception.getMessage();
+            Throwable throwable = exception.getCause();
+            logger.error("An error occurred while fetching account details. Error message {}. Error cause {}.",
+                    errorMessage, throwable);
+            throw exception;
+
+        } catch (Exception exception) {
+
+            String errorMessage = exception.getMessage();
+            Throwable throwable = exception.getCause();
+            logger.error("An error occurred while fetching account details. Error message {}. Error cause {}.",
+                    errorMessage, throwable);
+            throw new AccountNotFoundException(errorMessage, throwable);
+
+        }
     }
 
 }

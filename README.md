@@ -1,4 +1,4 @@
-# PTSD-Service
+# Spring OpenSearch-Service
 This is the Java Spring Opensearch Service Repository
 
 # Technical Stack & External Dependencies
